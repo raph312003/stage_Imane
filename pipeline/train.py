@@ -103,7 +103,14 @@ def val_one_epoch(
             total_loss += loss.item()
             val_dataloader.set_postfix(loss=loss.item())
 
-            f1 = f1_score(logits,mask)
+            # Transformation des logits en prédictions binaires
+            probs = torch.sigmoid(logits)
+            preds = (probs > 0.5).int()
+
+            preds = preds.detach().cpu().numpy().flatten()
+            mask = mask.detach().cpu().numpy().flatten()
+
+            f1 = f1_score(preds, mask, zero_division=0)
     
     return total_loss/len(val_dataloader), f1
 
