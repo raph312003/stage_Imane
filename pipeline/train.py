@@ -1,0 +1,234 @@
+import os
+import copy
+
+from tqdm import tqdm
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from sklearn.metrics import f1_score
+from pipeline.unet import Unet
+
+
+class DiceFocalLoss(nn.Module):
+    def __init__(
+        self,
+        dice_weight = 0.5,
+        alpha = 0.25,
+        gamma = 2.0,
+    ):
+        super().__init__()
+        self.dice_weight = dice_weight
+        self.alpha = alpha
+        self.gamma = gamma
+
+    def forward(self, logits, targets):
+        # Permettre opération mathématiques
+        targets = targets.float()
+
+        # convertir valeur en probabilité
+        probs = torch.sigmoid(logits)
+
+        dims = (1, 2, 3) # car shape (8,1,256,256) -> résultat 8 intersections avec 1 valeur
+        intersection = (probs*targets).sum(dim=dims)
+        denominator = probs.sum(dim=dims) + targets.sum(dim=dims)
+
+        dice = (2*intersection + 1e-6) / (denominator + 1e-6)
+
+        dice_loss = (1 - dice).mean()
+
+        # focal loss
+        bce = F.binary_cross_entropy_with_logits(
+            logits, targets, reduction="none"
+        )
+        pt = torch.exp(-bce)
+
+        alpha_t = (
+            self.alpha * targets
+            + (1 - self.alpha) * (1 - targets)
+        )
+
+        focal_loss = (
+            alpha_t * (1 - pt).pow(self.gamma) * bce
+        ).mean()
+
+        return (
+            self.dice_weight * dice_loss + (1-self.dice_weight) * focal_loss
+        )
+
+
+def train_one_epoch(
+    train_dataloader,
+    model,
+    device,
+    criterion,
+    optimizer
+):
+    model.train()
+    total_loss = 0.0
+
+    for image, mask in train_dataloader:
+        image = image.to(device)
+        mask = mask.to(device)
+
+        logits = model(image)
+
+        loss = criterion(logits, mask)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        total_loss += loss.item()
+        train_dataloader.set_postfix(loss=loss.item())
+
+    return total_loss/len(train_dataloader)
+
+def val_one_epoch(
+    val_dataloader,
+    model,
+    device,
+    criterion,
+):
+    model.eval()
+    total_loss = 0
+    with torch.no_grad():
+        for image, mask in val_dataloader:
+            image = image.to(device)
+            mask = mask.to(device)
+    
+            logits = model(image)
+    
+            loss = criterion(logits, mask)
+    
+            total_loss += loss.item()
+            val_dataloader.set_postfix(loss=loss.item())
+
+            f1_score = f1_score(logits,mask)
+    
+    return total_loss/len(val_dataloader), f1_score
+
+
+def compute_fusion_weights(f1_score):
+    f1_score_weight = []
+    total = sum(f1_score.value())
+
+    for key, value in f1_score.items():
+        f1_score_weight.append(value/total) 
+
+    return f1_score_weight
+
+def fuse_weight(logit_list, weights):
+
+    fused = torch.zeros_like(logit_list[0])
+
+    # Une image = somme pods et logits pour chaqye pixels
+    for logit, weight in zip(logit_list, weights) :
+        fused += logit * weight
+
+    return fused
+
+def logits_to_mask(fused_logits, threshold=0.5):
+    probabilities = torch.sigmoid(fused_logits)
+    return (probabilities >= threshold).float()
+
+
+def training_all(
+    train_dataloader,
+    val_dataloader,
+    device,
+    epoch,
+    early_stopping,
+    dice_weight
+):
+    best_f1_score = {}
+    best_weights = {}
+    # best_loss = 1000
+    best_f1 = 0
+    patience_counter = 0
+    
+
+    for name, train_loader in train_dataloader.items():
+        print(f"name model {name}")
+        checkpoint_path = f"model_weights/{name}_best.pth"
+
+        model = Unet().to(device)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+
+        criterion = DiceFocalLoss(dice_weight=dice_weight)
+
+        best_f1 = float("-inf")
+
+        for i in range(epoch):
+
+            train_bar = tqdm(
+                train_loader,
+                desc=f"Epoch{i+1}/{epoch}"
+            )
+
+            train_loss = train_one_epoch(
+                train_bar,
+                model,
+                device,
+                criterion,
+                optimizer
+            )
+
+            val_bar = tqdm(
+                val_dataloader[name],
+                desc=f"Epoch{i+1}/{epoch}"
+            )
+
+            _, f1_score = val_one_epoch(
+                val_bar,
+                model,
+                device,
+                criterion,
+            )
+
+            print(f"Name {name} | Epoch {i} | loss {train_loss} | f1_score {best_f1}")
+
+            # early stopping
+            # if val_loss < best_loss:
+            #     best_loss = val_loss
+
+            if f1_score > best_f1:
+                best_f1 = f1_score
+
+                # best_weights[name] = copy.deepcopy(model.state_dict())
+                os.makedirs(f"model_weights/", exist_ok=True)
+                torch.save(
+                    model.state_dict(),
+                    checkpoint_path
+                    
+                )
+
+            else:
+                patience_counter+=1
+
+            if patience_counter >= early_stopping:
+                print(f"Early stopping pour {name}")
+                break
+
+        model.load_state_dict(
+            torch.load(
+                checkpoint_path,
+                map_location=device,
+                weights_only=True,
+            )
+        )
+
+        best_weights[name] = model
+        best_f1_score[name] = best_f1
+
+        print(f"Meilleur F1 pour {name} : {best_f1:.4f}")
+        
+
+    return (best_weights, best_f1_score)
+
+
+
+
+
+        
+
