@@ -73,7 +73,7 @@ def main():
     #    transform = None
     #)
 
-    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_IMANE"
+    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
 
     dataset = load_dataset(
         img_dir=f"{dataset_path}/images/",
