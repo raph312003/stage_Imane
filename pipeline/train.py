@@ -103,9 +103,9 @@ def val_one_epoch(
             total_loss += loss.item()
             val_dataloader.set_postfix(loss=loss.item())
 
-            f1_score = f1_score(logits,mask)
+            f1 = f1_score(logits,mask)
     
-    return total_loss/len(val_dataloader), f1_score
+    return total_loss/len(val_dataloader), f1
 
 
 def compute_fusion_weights(f1_score):
