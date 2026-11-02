@@ -91,6 +91,8 @@ def val_one_epoch(
 ):
     model.eval()
     total_loss = 0
+    all_preds = []
+    all_masks = []
     with torch.no_grad():
         for image, mask in val_dataloader:
             image = image.to(device)
@@ -107,10 +109,13 @@ def val_one_epoch(
             probs = torch.sigmoid(logits)
             preds = (probs > 0.5).int()
 
-            preds = preds.detach().cpu().numpy().flatten()
-            mask = mask.detach().cpu().numpy().flatten()
+            preds = preds.cpu().numpy().flatten()
+            mask = mask.cpu().numpy().flatten()
 
-            f1 = f1_score(preds, mask, zero_division=0)
+            all_preds.extend(preds)
+            all_masks.extend(mask)
+
+        f1 = f1_score(all_preds, all_masks, zero_division=0)
     
     return total_loss/len(val_dataloader), f1
 
