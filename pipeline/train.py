@@ -79,7 +79,7 @@ def train_one_epoch(
         optimizer.step()
 
         total_loss += loss.item()
-        train_dataloader.set_postfix(loss=loss.item())
+        #train_dataloader.set_postfix(loss=loss.item())
 
     return total_loss/len(train_dataloader)
 
@@ -103,7 +103,7 @@ def val_one_epoch(
             loss = criterion(logits, mask)
     
             total_loss += loss.item()
-            val_dataloader.set_postfix(loss=loss.item())
+            #val_dataloader.set_postfix(loss=loss.item())
 
             # Transformation des logits en prédictions binaires
             probs = torch.sigmoid(logits)
@@ -179,30 +179,29 @@ def training_all(
 
         criterion = DiceFocalLoss(dice_weight=dice_weight)
 
-        best_f1 = float("-inf")
 
         for i in range(epoch):
 
-            train_bar = tqdm(
-                train_loader,
-                desc=f"Epoch{i+1}/{epoch}"
-            )
+            #train_bar = tqdm(
+            #    train_loader,
+            #    desc=f"Epoch{i+1}/{epoch}"
+            #)
 
             train_loss = train_one_epoch(
-                train_bar,
+                train_loader,
                 model,
                 device,
                 criterion,
                 optimizer
             )
 
-            val_bar = tqdm(
-                val_dataloader[name],
-                desc=f"Epoch{i+1}/{epoch}"
-            )
+            #val_bar = tqdm(
+            #    val_dataloader[name],
+            #    desc=f"Epoch{i+1}/{epoch}"
+            #)
 
             _, f1_score = val_one_epoch(
-                val_bar,
+                val_dataloader[name],
                 model,
                 device,
                 criterion,

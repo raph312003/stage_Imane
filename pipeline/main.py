@@ -16,8 +16,8 @@ from pipeline.test import test
 def main():
 
     SCALES = {
-        "patchs256": 256,
-        "patchs512": 512,
+        "patchs256": 64,
+        "patchs512": 128,
         "full_patch": None
     }   
 
