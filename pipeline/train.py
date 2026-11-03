@@ -122,7 +122,7 @@ def val_one_epoch(
 
 def compute_fusion_weights(f1_score):
     f1_score_weight = []
-    total = sum(f1_score.value())
+    total = sum(f1_score.values())
 
     for key, value in f1_score.items():
         f1_score_weight.append(value/total) 
@@ -131,10 +131,18 @@ def compute_fusion_weights(f1_score):
 
 def fuse_weight(logit_list, weights):
 
+    if len(logit_list) != len(weights):
+        raise ValueError("Nombre de logits différent du nombre de poids.")
+
+    if len(logit_list) == 0:
+        raise ValueError("Liste de logits vide.")
+
     fused = torch.zeros_like(logit_list[0])
 
-    # Une image = somme pods et logits pour chaqye pixels
-    for logit, weight in zip(logit_list, weights) :
+    for logit, weight in zip(logit_list, weights):
+        if logit.shape != fused.shape:
+            raise ValueError("Les logits doivent avoir la même shape.")
+
         fused += logit * weight
 
     return fused
@@ -155,13 +163,15 @@ def training_all(
     best_f1_score = {}
     best_weights = {}
     # best_loss = 1000
-    best_f1 = 0
-    patience_counter = 0
     
 
     for name, train_loader in train_dataloader.items():
         print(f"name model {name}")
         checkpoint_path = f"model_weights/{name}_best.pth"
+
+        best_f1 = float("-inf")
+        patience_counter = 0
+            
 
         model = Unet().to(device)
 
@@ -198,7 +208,7 @@ def training_all(
                 criterion,
             )
 
-            print(f"Name {name} | Epoch {i} | loss {train_loss} | f1_score {best_f1}")
+            print(f"Name {name} | Epoch {i} | loss {train_loss:.4f} | f1_score {f1_score:.4f}")
 
             # early stopping
             # if val_loss < best_loss:
@@ -206,6 +216,7 @@ def training_all(
 
             if f1_score > best_f1:
                 best_f1 = f1_score
+                patience_counter = 0
 
                 # best_weights[name] = copy.deepcopy(model.state_dict())
                 os.makedirs(f"model_weights/", exist_ok=True)
