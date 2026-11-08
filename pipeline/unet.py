@@ -6,7 +6,7 @@ class DoubleConv(nn.Module):
         self,
         in_channels: int = 1,
         out_channels: int = 64,
-        instance_norm: bool = True,
+        instance_norm: bool = False,
         kernel_size: int = 3,
     ):
         super().__init__()
@@ -115,4 +115,4 @@ class Unet(nn.Module):
 
 model = Unet()
 y = model(torch.randn(4,3,64,64))
-print(y.shape)
+# print(y.shape)

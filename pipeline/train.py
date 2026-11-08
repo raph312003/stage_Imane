@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import f1_score
 from pipeline.unet import Unet
+import numpy as np
 
 
 class DiceFocalLoss(nn.Module):
@@ -66,7 +67,7 @@ def train_one_epoch(
     model.train()
     total_loss = 0.0
 
-    for image, mask in train_dataloader:
+    for image, mask, _, _ in train_dataloader:
         image = image.to(device)
         mask = mask.to(device)
 
@@ -79,7 +80,7 @@ def train_one_epoch(
         optimizer.step()
 
         total_loss += loss.item()
-        #train_dataloader.set_postfix(loss=loss.item())
+        train_dataloader.set_postfix(loss=loss.item())
 
     return total_loss/len(train_dataloader)
 
@@ -94,7 +95,7 @@ def val_one_epoch(
     all_preds = []
     all_masks = []
     with torch.no_grad():
-        for image, mask in val_dataloader:
+        for image, mask, _, _ in val_dataloader:
             image = image.to(device)
             mask = mask.to(device)
     
@@ -103,7 +104,7 @@ def val_one_epoch(
             loss = criterion(logits, mask)
     
             total_loss += loss.item()
-            #val_dataloader.set_postfix(loss=loss.item())
+            val_dataloader.set_postfix(loss=loss.item())
 
             # Transformation des logits en prédictions binaires
             probs = torch.sigmoid(logits)
@@ -112,10 +113,15 @@ def val_one_epoch(
             preds = preds.cpu().numpy().flatten()
             mask = mask.cpu().numpy().flatten()
 
-            all_preds.extend(preds)
-            all_masks.extend(mask)
+            all_preds.append(preds)
+            all_masks.append(mask)
+        
+        # print(len(all_masks))
+        # print(len(all_preds))
+        y_pred = np.concatenate(all_preds)
+        y_true = np.concatenate(all_masks).astype(int)
 
-        f1 = f1_score(all_preds, all_masks, zero_division=0)
+        f1 = f1_score(y_true, y_pred, zero_division=0)
     
     return total_loss/len(val_dataloader), f1
 
@@ -162,10 +168,15 @@ def training_all(
 ):
     best_f1_score = {}
     best_weights = {}
+    dict_training_loss ={}
+    dict_val_f1_score={}
+    
     # best_loss = 1000
     
 
     for name, train_loader in train_dataloader.items():
+        training_loss = []
+        val_f1_score = []
         print(f"name model {name}")
         checkpoint_path = f"model_weights/{name}_best.pth"
 
@@ -182,37 +193,36 @@ def training_all(
 
         for i in range(epoch):
 
-            #train_bar = tqdm(
-            #    train_loader,
-            #    desc=f"Epoch{i+1}/{epoch}"
-            #)
+            train_bar = tqdm(
+               train_loader,
+               desc=f"Epoch{i+1}/{epoch}"
+            )
 
             train_loss = train_one_epoch(
-                train_loader,
+                train_bar,
                 model,
                 device,
                 criterion,
                 optimizer
             )
+            training_loss.append(train_loss)
 
-            #val_bar = tqdm(
-            #    val_dataloader[name],
-            #    desc=f"Epoch{i+1}/{epoch}"
-            #)
+            val_bar = tqdm(
+               val_dataloader[name],
+               desc=f"Epoch{i+1}/{epoch}"
+            )
 
             _, f1_score = val_one_epoch(
-                val_dataloader[name],
+                val_bar,
                 model,
                 device,
                 criterion,
             )
+            val_f1_score.append(f1_score)
 
-            print(f"Name {name} | Epoch {i} | loss {train_loss:.4f} | f1_score {f1_score:.4f}")
+            print(f"Name {name} | Epoch {i+1} | loss {train_loss:.4f} | f1_score {f1_score:.4f}")
 
-            # early stopping
-            # if val_loss < best_loss:
-            #     best_loss = val_loss
-
+            
             if f1_score > best_f1:
                 best_f1 = f1_score
                 patience_counter = 0
@@ -240,13 +250,15 @@ def training_all(
             )
         )
 
-        best_weights[name] = model
+        best_weights[name] = model.state_dict()
         best_f1_score[name] = best_f1
+        dict_training_loss[name] = training_loss
+        dict_val_f1_score[name] = val_f1_score
 
         print(f"Meilleur F1 pour {name} : {best_f1:.4f}")
         
 
-    return (best_weights, best_f1_score)
+    return (best_weights, best_f1_score, dict_training_loss, dict_val_f1_score)
 
 
 

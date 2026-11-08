@@ -6,9 +6,10 @@ from torch.utils.data import DataLoader
 from torch.utils.data import random_split
 
 from pipeline.dataset import load_dataset
-from pipeline.utils import PatchDataset
+from pipeline.utils import PatchDataset, patch_collate_fn
 from pipeline.train import training_all, compute_fusion_weights 
-from pipeline.test import test
+from pipeline.test import test, graph_loss_epoch, display_result
+import os
 
 
 
@@ -16,9 +17,9 @@ from pipeline.test import test
 def main():
 
     SCALES = {
-        "patchs256": 64,
-        "patchs512": 128,
-        "full_patch": None
+        "patches256": 128, # 128
+        "patches512": 256, # 256
+        "full_patches": None # 512
     }   
 
     train_transform = A.Compose(
@@ -67,19 +68,19 @@ def main():
     
     #print(os.getcwd())
 
-    # dataset = load_dataset(
-    #    img_dir= "Dataset_Imane/images/",
-    #    mask_dir= "Dataset_Imane/masque/",
-    #    transform = None
-    #)
-
-    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
-
     dataset = load_dataset(
-        img_dir=f"{dataset_path}/images/",
-        mask_dir=f"{dataset_path}/masque/",
-        transform=train_transform
+        img_dir= "Dataset_Imane/images/",
+        mask_dir= "Dataset_Imane/masque/",
+        transform = None
     )
+
+    #dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
+
+    #dataset = load_dataset(
+     #   img_dir=f"{dataset_path}/images/",
+     #   mask_dir=f"{dataset_path}/masque/",
+     #   transform=train_transform
+    #)
 
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
@@ -95,6 +96,7 @@ def main():
 
     train_dataloader = {}
     val_dataloader = {}
+    # test_dataloader = {}
 
     for key, value in SCALES.items():
 
@@ -110,44 +112,45 @@ def main():
             transform = train_transform
         )
 
-        if key == "patchs256":
-            batch_size = 8
-        elif key == "patchs512":
-            batch_size = 4
-        elif key == "full_patch":
+        if key == "patches256":
+            batch_size = 16
+        elif key == "patches512":
+            batch_size = 8 # 8
+        elif key == "full_patches":
             batch_size = 1
 
 
         train_dataloader[key] = DataLoader(train_patchs, batch_size=batch_size, shuffle=True)
-        val_dataloader[key] = DataLoader(val_patchs, batch_size=batch_size, shuffle=False)
-
-    # print(len(train_dataloader.keys()))
-    # print(len(val_dataloader.keys()))
-
-    # images, masks = next(iter(train_dataloader.keys()))
-
-    # print("Taille des images :", images.shape)
-    # print("Taille des masques :", masks.shape)
+        val_dataloader[key] = DataLoader(val_patchs, batch_size=batch_size, shuffle=False, collate_fn=patch_collate_fn)
+        # test_dataloader[key] = DataLoader(val_patchs, batch_size=batch_size, shuffle=False)
 
     
 
-    best_weights, best_f1_score = training_all(
+    best_weights, best_f1_score, training_loss, val_f1_score = training_all(
         train_dataloader,
         val_dataloader,
         device,
-        epoch=1000,
-        early_stopping=10,
+        epoch=1000, # 1000
+        early_stopping=10, # 10
         dice_weight=0.5
     )
 
-    f1_score_weight = compute_fusion_weights(best_f1_score)
+    # f1_score_weight = compute_fusion_weights(best_f1_score)
+    
 
-    test(
-        val_dataloader,
-        best_weights,
-        f1_score_weight,
-        device
-    )
+    # all_preds, all_masks, all_input = test(
+    #     val_dataloader,
+    #     best_weights,
+    #     f1_score_weight,
+    #     device
+    # )
+
+    # display_result(all_preds, all_masks, all_input)
+    
+
+    graph_loss_epoch(training_loss, val_f1_score)
+
+
    
 
 if __name__ == "__main__":
