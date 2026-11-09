@@ -113,7 +113,9 @@ def get_patchs_to_img(
         dtype=np.float32
     )
 
+    print("position", positions)
     for patch, (init_x, init_y) in zip(patchs, positions):
+        print("init_x, init_y", init_x, init_y)
 
         # Pour 1 pixel somme de plusieurs pixels Ex : pixel_0 = 0.9 + 0.9 + 0.9 = 2.7
         if isinstance(patch, torch.Tensor):

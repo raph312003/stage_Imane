@@ -8,7 +8,7 @@ import torch.nn.functional as F
 from sklearn.metrics import f1_score
 from pipeline.unet import Unet
 import numpy as np
-
+import segmentation_models_pytorch as smp
 
 class DiceFocalLoss(nn.Module):
     def __init__(
@@ -164,29 +164,58 @@ def training_all(
     device,
     epoch,
     early_stopping,
-    dice_weight
+    dice_weight,
+    best_weights,
+    learning_rate
 ):
     best_f1_score = {}
-    best_weights = {}
+    updated_weights = {}
     dict_training_loss ={}
-    dict_val_f1_score={}
-    
-    # best_loss = 1000
-    
+    dict_val_f1_score={}    
 
     for name, train_loader in train_dataloader.items():
         training_loss = []
         val_f1_score = []
+        
         print(f"name model {name}")
         checkpoint_path = f"model_weights/{name}_best.pth"
 
         best_f1 = float("-inf")
         patience_counter = 0
-            
+    
+        # model = Unet().to(device)
 
-        model = Unet().to(device)
+        # Initialisation des poids de l'encoder Resnet avec le spoids Imagenet
+        # Tous le spoids du réseau est entraînable
+        # Pour geler l'encoder on peut utiliser 
+        # for param in model.encoder.parameters():
+        #   param.requires_grad = False
+        model = smp.UnetPlusPlus(
+            encoder_name="resnet34",
+            encoder_weights="imagenet",
+            in_channels=3,
+            classes=1
+        )
 
-        optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+        if name in best_weights:
+            print("fine tuning")
+            model.load_state_dict(best_weights[name])
+
+            # Gel de l'encoder
+            for param in model.encoder.parameters():
+                param.requires_grad = False
+
+            # Optimisation du decoder uniquement
+            optimizer = torch.optim.Adam(
+                filter(lambda p: p.requires_grad, model.parameters()),
+                lr=learning_rate
+            )
+        else :
+
+            for name_pa, param in model.named_parameters():
+                print(name_pa, param.requires_grad)
+
+            optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
         criterion = DiceFocalLoss(dice_weight=dice_weight)
 
@@ -250,7 +279,7 @@ def training_all(
             )
         )
 
-        best_weights[name] = model.state_dict()
+        updated_weights[name] = model.state_dict()
         best_f1_score[name] = best_f1
         dict_training_loss[name] = training_loss
         dict_val_f1_score[name] = val_f1_score
@@ -259,10 +288,6 @@ def training_all(
         
 
     return (best_weights, best_f1_score, dict_training_loss, dict_val_f1_score)
-
-
-
-
 
         
 

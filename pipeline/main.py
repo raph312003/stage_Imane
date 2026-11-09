@@ -2,19 +2,21 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, ConcatDataset
 from torch.utils.data import random_split
 
-from pipeline.dataset import load_dataset
-from pipeline.utils import PatchDataset, patch_collate_fn
+from pipeline.dataset import load_dataset, create_dataloader
+from pipeline.utils import PatchDataset
 from pipeline.train import training_all, compute_fusion_weights 
-from pipeline.test import test, graph_loss_epoch, display_result
+from pipeline.test import test, graph_loss_epoch, display_result, generate_pseudo_label
 import os
 
 
 
 
 def main():
+
+    NUM_ITERATIONS = 3
 
     SCALES = {
         "patches256": 128, # 128
@@ -71,7 +73,15 @@ def main():
     dataset = load_dataset(
         img_dir= "Dataset_Imane/images/",
         mask_dir= "Dataset_Imane/masque/",
-        transform = None
+        transform = None,
+        unlabeled=False
+    )
+
+    unlabeled_dataset = load_dataset(
+        img_dir= "Dataset_unlabeled/images/",
+        mask_dir= "Dataset_unlabeled/masque/",
+        transform = None,
+        unlabeled=True
     )
 
     #dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
@@ -92,63 +102,100 @@ def main():
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
 
-    train_dataloader = {}
-    val_dataloader = {}
-    # test_dataloader = {}
-
-    for key, value in SCALES.items():
-
-        train_patchs = PatchDataset(
-            train_dataset,
-            patch_size=value,
-            transform = train_transform
-        )
-
-        val_patchs = PatchDataset(
-            val_dataset,
-            patch_size=value,
-            transform = train_transform
-        )
-
-        if key == "patches256":
-            batch_size = 16
-        elif key == "patches512":
-            batch_size = 8 # 8
-        elif key == "full_patches":
-            batch_size = 1
-
-
-        train_dataloader[key] = DataLoader(train_patchs, batch_size=batch_size, shuffle=True)
-        val_dataloader[key] = DataLoader(val_patchs, batch_size=batch_size, shuffle=False, collate_fn=patch_collate_fn)
-        # test_dataloader[key] = DataLoader(val_patchs, batch_size=batch_size, shuffle=False)
-
-    
-
-    best_weights, best_f1_score, training_loss, val_f1_score = training_all(
-        train_dataloader,
-        val_dataloader,
-        device,
-        epoch=1000, # 1000
-        early_stopping=10, # 10
-        dice_weight=0.5
+    train_dataloader, val_dataloader, unlabeled_dataloader = create_dataloader(
+        train_dataset,
+        val_dataset,
+        unlabeled_dataset,
+        SCALES,
+        train_transform
     )
 
-    # f1_score_weight = compute_fusion_weights(best_f1_score)
-    
-
-    # all_preds, all_masks, all_input = test(
+    # # 1 st training already satisfy
+    # best_weights, best_f1_score, training_loss, val_f1_score = training_all(
+    #     train_dataloader,
     #     val_dataloader,
-    #     best_weights,
-    #     f1_score_weight,
-    #     device
+    #     device,
+    #     epoch=1000, # 1000
+    #     early_stopping=10, # 10
+    #     dice_weight=0.5,
+    #     best_weights ={},
+    #     learning_rate=1e-4
     # )
 
-    # display_result(all_preds, all_masks, all_input)
-    
+    # In case there is a problem with the testing part
+    best_f1_score = {
+        "patches256": 0.2789,
+        "patches512": 0.2578,
+        "full_patches": 0.3753
+    }
+      
 
+    best_weights = {}
+
+    for name, value in SCALES.items():
+        
+        best_weights[name] = torch.load(
+            f"model_weights/{name}_best.pth",
+            map_location=device,
+            weights_only=True,
+        )
+
+    for iteration in range(NUM_ITERATIONS):
+
+        print(f"\n===== SELF-TRAINING ITERATION {iteration + 1} =====")
+
+        # Generate pseudo-labels
+        pseudo_dataset = generate_pseudo_label(
+            unlabeled_dataloader,
+            best_weights,
+            best_f1_score,
+            device,
+            iteration=iteration
+        )
+
+        # Combine real and pseudo-labeled data
+        combined_dataset = ConcatDataset([
+            train_dataset,
+            pseudo_dataset
+        ])
+
+        # Create new dataloaders
+        train_dataloader, val_dataloader = create_dataloader(
+            combined_dataset,
+            val_dataset,
+            unlabeled_dataloader,
+            SCALES,
+            train_transform
+        )
+
+        # Fine-tuning
+        best_weights, best_f1_score, training_loss, val_f1_score = training_all(
+            train_dataloader,
+            val_dataloader,
+            device,
+            epoch=1000, # 1000
+            early_stopping=10, # 10
+            dice_weight=0.5,
+            best_weights ={},
+            learning_rate=1e-5
+        )
+        
+
+    f1_score_weight = compute_fusion_weights(best_f1_score)
+
+    all_preds, all_masks, all_input = test(
+            val_dataloader,
+            best_weights,
+            f1_score_weight,
+            device
+        )
+    # Plotting results 
+    display_result(all_preds, all_masks, all_input)
+
+    # Plotting graph for train and val loss
     graph_loss_epoch(training_loss, val_f1_score)
+    
 
 
    
