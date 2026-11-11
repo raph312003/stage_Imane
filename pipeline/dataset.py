@@ -17,7 +17,7 @@ class load_dataset(Dataset):
     ):
         self.img_dir = img_dir
         self.mask_dir = mask_dir
-        self.image = os.listdir(img_dir)
+        self.image = os.listdir(img_dir)#[:2]
         self.transform = transform 
         self.unlabeled = unlabeled
 
@@ -116,6 +116,6 @@ def create_dataloader(
 
         train_dataloader[key] = DataLoader(train_patchs, batch_size=batch_size, shuffle=True)
         val_dataloader[key] = DataLoader(val_patchs, batch_size=batch_size, shuffle=False, collate_fn=patch_collate_fn)
-        unlabeled_dataloader[key] = DataLoader(unlabeled_patchs, batch_size=batch_size,shuffle=False)
+        unlabeled_dataloader[key] = DataLoader(unlabeled_patchs, batch_size=batch_size,shuffle=False, collate_fn=patch_collate_fn)
 
     return train_dataloader, val_dataloader, unlabeled_dataloader

@@ -25,7 +25,6 @@ def predict_patches(model, loader, device):
     with torch.no_grad():
 
         for inputs, masks, positions, indices in loader:
-            # print("positions",positions)
 
             inputs = inputs.to(device)
 
@@ -34,9 +33,6 @@ def predict_patches(model, loader, device):
             for logit, mask, position, idx in zip(
                 logits, masks, positions, indices
             ):
-                # print("position",logit.shape)
-                # print("position",mask.shape)
-                # print("position",idx)
                 
                 idx = idx.item() if torch.is_tensor(idx) else int(idx)
 
@@ -50,7 +46,7 @@ def predict_patches(model, loader, device):
                 predictions[idx]["logits"].append(
                     logit.unsqueeze(0)
                 )
-
+                # print("position",position)
                 predictions[idx]["masks"].append(mask.unsqueeze(0))
                 predictions[idx]["positions"].append(position)
 
@@ -114,14 +110,6 @@ def test(
     full_predictions = {}
     full_inputs = {}
     full_masks = {}
-
-    print("Nombre de batches 256 :", len(test_dataloader["patches256"]))
-    print("Nombre de batches 512 :", len(test_dataloader["patches512"]))
-    print("Nombre de batches full :", len(test_dataloader["full_patches"]))
-
-    print("Nombre de prédictions 256 :", len(pred256))
-    print("Nombre de prédictions 512 :", len(pred512))
-    print("Nombre de prédictions full :", len(full_predictions))
 
     with torch.no_grad():
 
@@ -258,8 +246,8 @@ def generate_pseudo_label(
     
     all_preds_mask = []
     all_input = []
+    all_index = []
 
-    print("start 0")
     model1 = smp.UnetPlusPlus(
         encoder_name="resnet34",
         encoder_weights="imagenet",
@@ -281,7 +269,6 @@ def generate_pseudo_label(
         classes=1
     )
 
-    print("start 1")
 
     # Initialisation des modèles
     # model1 = Unet().to(device)
@@ -292,8 +279,6 @@ def generate_pseudo_label(
     model2.load_state_dict(best_weight["patches512"])
     model3.load_state_dict(best_weight["full_patches"])
 
-    print("start 3")
-
     # Prédictions des modèles à patches
     pred256 = predict_patches(
         model1, unlabeled_dataset["patches256"], device
@@ -303,7 +288,6 @@ def generate_pseudo_label(
         model2, unlabeled_dataset["patches512"], device
     )
 
-    print("Prediction des modèles de patches")
 
     # Prédictions du modèle full
     model3.eval()
@@ -311,6 +295,8 @@ def generate_pseudo_label(
     full_predictions = {}
     full_inputs = {}
     full_masks = {}
+
+    
 
     with torch.no_grad():
 
@@ -329,8 +315,6 @@ def generate_pseudo_label(
                 full_inputs[idx] = img.unsqueeze(0)
                 full_masks[idx] = mask.unsqueeze(0).to(device)
 
-    print("Prediction full_model")
-
     # Fusion et reconstruction image par image
     for i, idx in enumerate(full_predictions):
 
@@ -339,13 +323,11 @@ def generate_pseudo_label(
         mask_full = full_masks[idx]
 
         # Reconstruction des logits 256 liste -> array
+        # print(pred256[idx]["logits"].shape)
         logits256 = torch.cat(
             pred256[idx]["logits"], dim=0
         ).to(device)
 
-        print("logits256",logits256.shape)
-        print("input_full.shape",input_full.shape)
-        print("pred256[idx][positions]",pred256[idx]["positions"])
         image_full_256 = get_patchs_to_img(
             logits256,
             input_full.shape,
@@ -376,22 +358,31 @@ def generate_pseudo_label(
             weights=f1_score_weight
         )
 
-        probs = torch.sigmoid(fused_logits)
-        preds = (probs >= 0.5).int()
+        pseudo_label, valid_mask = generate_reliable_pseudo_label(
+            [fused_logits,image_full_256,image_full_512, logits_full]
+        )
+    
         print(f"Generation {i} labels, idx = {idx}")
 
         # Stockage
+        
         all_preds_mask.append(
-            preds.detach().cpu()#.unsqueeze(0)
+            pseudo_label.detach().cpu()#.unsqueeze(0)
         )
 
         all_input.append(
-            input_full.detach().cpu().permute(2,1,0)
+            input_full.detach().cpu().squeeze(0).permute(2,1,0)
         )
+        print(idx)
+        all_index.append(torch.tensor(idx))
+
 
     # Construction des tenseurs
     all_input = torch.stack(all_input, dim=0)
     all_preds_mask = torch.stack(all_preds_mask, dim=0)
+    all_idx = torch.stack(all_index, dim=0)
+
+    display_result_pseudo_labels(all_preds_mask, all_input, all_idx, iteration)
 
     # Construction du Dataset
     pseudo_dataset = PseudoLabelDataset(
@@ -407,7 +398,7 @@ def display_result(all_preds, all_masks, all_input):
     names = ["patches256", "patches512", "full_patches", "fusion"]
 
     for name in names:
-        fig, axes = plt.subplots(3, all_preds[name].shape[0], figsize=(65,60))
+        fig, axes = plt.subplots(3, all_preds[name].shape[0], figsize=(5*all_preds[name].shape[0],10), squeeze=False)
 
         preds = all_preds[name]
         masks = all_masks[name]
@@ -416,22 +407,45 @@ def display_result(all_preds, all_masks, all_input):
         for i in range(preds.shape[0]):
 
             axes[0][i].imshow(preds[i], cmap = "gray")
-            axes[0][0].set_title("pred")
+            axes[0][i].set_title("pred")
             axes[0][i].axis("off")
 
             axes[1][i].imshow(masks[i], cmap = "gray")
-            axes[1][0].set_title("pred")  
+            axes[1][i].set_title("pred")  
             axes[1][i].axis("off")
 
             axes[2][i].imshow(inputs[i].transpose(1, 2, 0), cmap = "gray")
-            axes[2][0].set_title("input")  
+            axes[2][i].set_title("input")  
             axes[2][i].axis("off")
 
         plt.tight_layout()
         plt.savefig(f"images/{name}.png")
-        plt.close()  
+        plt.close() 
 
-def graph_loss_epoch(list_avg_train_loss, list_avg_val_loss):
+def display_result_pseudo_labels(all_preds, all_input, all_index, iteration):
+    
+    max_image = 2
+    #for name in names:
+    fig, axes = plt.subplots(2, max_image, figsize=(5*max_image, 10))
+
+    preds = all_preds
+    inputs = all_input
+
+    for i in range(max_image):
+
+        axes[0][i].imshow(preds[i], cmap = "gray")
+        axes[0][i].set_title(f"pred, index = {all_index[i]}")
+        axes[0][i].axis("off")
+
+        axes[1][i].imshow(inputs[i], cmap = "gray")
+        axes[1][i].set_title(f"input, index = {all_index[i]}")  
+        axes[1][i].axis("off")
+
+    plt.tight_layout()
+    plt.savefig(f"images/pseudo_labels_{iteration}.png")
+    plt.close()   
+
+def graph_loss_epoch(list_avg_train_loss, list_avg_val_loss, iteration):
 
     fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -462,10 +476,69 @@ def graph_loss_epoch(list_avg_train_loss, list_avg_val_loss):
     ax.grid(alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig("images/all_loss_curves.png")
+    plt.savefig(f"images/all_loss_curves_{iteration}.png")
     plt.show()
     plt.close()
 
 
 
            
+def generate_reliable_pseudo_label(logit_list):
+
+    mean_prob, variance, agreement, confidence = (
+        compute_ensemble_metrics(logit_list)
+    )
+
+    # Pixels suffisamment confiants
+    reliable = (
+        ((mean_prob >= 0.9) | (mean_prob <= 0.1))
+        & (agreement >= 2/3)
+        & (variance <= 0.02)
+    )
+
+    pseudo_label = (mean_prob >= 0.5).float()
+
+    # Pixels incertains ignorés pendant l'entraînement
+    valid_mask = reliable.float()
+
+    coverage = valid_mask.mean().item()
+
+    print(f"Reliable pixels: {coverage*100:.2f}%")
+
+    return pseudo_label, valid_mask
+
+def compute_ensemble_metrics(logit_list):
+
+    # Conversion des logits en probabilités
+    probs = torch.stack([
+        torch.sigmoid(logit).squeeze()
+        for logit in logit_list
+    ])
+
+    # Moyenne des probabilités
+    mean_prob = probs.mean(dim=0)
+
+    # Variance entre les modèles
+    variance = probs.var(dim=0, unbiased=False)
+
+    # Prédictions binaires
+    binary_preds = probs >= 0.5
+
+    # Nombre de modèles qui prédisent la classe 1
+    foreground_votes = binary_preds.sum(dim=0)
+
+    # Accord majoritaire
+    n_models = len(logit_list)
+
+    agreement = torch.maximum(
+        foreground_votes,
+        n_models - foreground_votes
+    ) / n_models
+
+    # Confiance de la prédiction moyenne
+    confidence = torch.maximum(
+        mean_prob,
+        1 - mean_prob
+    )
+
+    return mean_prob, variance, agreement, confidence

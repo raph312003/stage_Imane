@@ -211,9 +211,9 @@ def training_all(
                 lr=learning_rate
             )
         else :
-
-            for name_pa, param in model.named_parameters():
-                print(name_pa, param.requires_grad)
+            print("First training")
+            # for name_pa, param in model.named_parameters():
+            #     print(name_pa, param.requires_grad)
 
             optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -256,7 +256,7 @@ def training_all(
                 best_f1 = f1_score
                 patience_counter = 0
 
-                # best_weights[name] = copy.deepcopy(model.state_dict())
+                # updated_weights[name] = copy.deepcopy(model.state_dict())
                 os.makedirs(f"model_weights/", exist_ok=True)
                 torch.save(
                     model.state_dict(),
@@ -287,7 +287,7 @@ def training_all(
         print(f"Meilleur F1 pour {name} : {best_f1:.4f}")
         
 
-    return (best_weights, best_f1_score, dict_training_loss, dict_val_f1_score)
+    return (updated_weights, best_f1_score, dict_training_loss, dict_val_f1_score)
 
         
 

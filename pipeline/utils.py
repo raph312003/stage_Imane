@@ -94,10 +94,6 @@ def get_patchs_to_img(
     img_shape,
     positions
 ):
-    # print(len(positions), "positions")
-    # # print(img_shape, "img_shape")
-    # print(len(patchs), "patchs")
-    # print("image_shape",img_shape)
 
     H, W = img_shape[-2:]
     
@@ -113,9 +109,9 @@ def get_patchs_to_img(
         dtype=np.float32
     )
 
-    print("position", positions)
+    # print("position", positions)
     for patch, (init_x, init_y) in zip(patchs, positions):
-        print("init_x, init_y", init_x, init_y)
+        # print("init_x, init_y", init_x, init_y)
 
         # Pour 1 pixel somme de plusieurs pixels Ex : pixel_0 = 0.9 + 0.9 + 0.9 = 2.7
         if isinstance(patch, torch.Tensor):
@@ -179,18 +175,12 @@ class PatchDataset():
 
     def __getitem__(self, index):
         img, mask, position, idx = self.patches[index]
-        # print("img", img.shape)
-        # print("mask", mask.shape)
-        # print("position", len(position))
-        # print("position", position)
-        # print("idx", idx)
         
-
         if self.transform is not None:
             augmentation = self.transform(image=img, mask=mask)
             img = augmentation["image"]
             mask = augmentation["mask"]
-
+        # print(img.shape, mask.unsqueeze(0).shape, position,idx )
         return img, mask.unsqueeze(0), position, idx
 
 

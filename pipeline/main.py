@@ -84,13 +84,21 @@ def main():
         unlabeled=True
     )
 
-    #dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
+    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
 
-    #dataset = load_dataset(
-     #   img_dir=f"{dataset_path}/images/",
-     #   mask_dir=f"{dataset_path}/masque/",
-     #   transform=train_transform
-    #)
+    dataset = load_dataset(
+       img_dir=f"{dataset_path}/images/",
+       mask_dir=f"{dataset_path}/masque/",
+       transform=train_transform
+    )
+
+    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Unlabeled"
+    
+    dataset = load_dataset(
+        img_dir=f"{dataset_path}/images/",
+        mask_dir=f"{dataset_path}/masque/",
+        transform=train_transform
+    )
 
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
@@ -111,65 +119,87 @@ def main():
         train_transform
     )
 
-    # # 1 st training already satisfy
-    # best_weights, best_f1_score, training_loss, val_f1_score = training_all(
-    #     train_dataloader,
-    #     val_dataloader,
-    #     device,
-    #     epoch=1000, # 1000
-    #     early_stopping=10, # 10
-    #     dice_weight=0.5,
-    #     best_weights ={},
-    #     learning_rate=1e-4
-    # )
+    # 1 st training already satisfy
+    best_weights, best_f1_score, training_loss, val_f1_score = training_all(
+        train_dataloader,
+        val_dataloader,
+        device,
+        epoch=1000, # 1000
+        early_stopping=10, # 10
+        dice_weight=0.5,
+        best_weights ={},
+        learning_rate=1e-4
+    )
 
-    # In case there is a problem with the testing part
-    best_f1_score = {
-        "patches256": 0.2789,
-        "patches512": 0.2578,
-        "full_patches": 0.3753
-    }
+    # # In case there is a problem with the testing part
+    # best_f1_score = {
+    #     "patches256": 0.2746,
+    #     "patches512": 0.2710,
+    #     "full_patches": 0.3673
+    # }
       
 
-    best_weights = {}
+    # best_weights = {}
 
-    for name, value in SCALES.items():
+    # for name, value in SCALES.items():
         
-        best_weights[name] = torch.load(
-            f"model_weights/{name}_best.pth",
-            map_location=device,
-            weights_only=True,
-        )
+    #     best_weights[name] = torch.load(
+    #         f"model_weights/{name}_best.pth",
+    #         map_location=device,
+    #         weights_only=True,
+    #     )
 
-    for iteration in range(NUM_ITERATIONS):
+    # Plotting graph for train and val loss
+    # iteration = 0
+    # graph_loss_epoch(training_loss, val_f1_score, iteration)
+
+    f1_score_weight = compute_fusion_weights(best_f1_score)
+            
+    
+    all_preds, all_masks, all_input = test(
+            val_dataloader,
+            best_weights,
+            f1_score_weight,
+            device
+        )
+    
+    # SELF-TRAINING ITERATION
+
+    for iteration in range(1, NUM_ITERATIONS+1):
 
         print(f"\n===== SELF-TRAINING ITERATION {iteration + 1} =====")
 
+        f1_score_weight = compute_fusion_weights(best_f1_score)
+
         # Generate pseudo-labels
+        print(" 1) Generate pseudo-labels")
         pseudo_dataset = generate_pseudo_label(
             unlabeled_dataloader,
             best_weights,
-            best_f1_score,
+            f1_score_weight,
             device,
             iteration=iteration
         )
 
         # Combine real and pseudo-labeled data
+        print(" 2) ConcatDataset")
         combined_dataset = ConcatDataset([
             train_dataset,
             pseudo_dataset
         ])
 
         # Create new dataloaders
-        train_dataloader, val_dataloader = create_dataloader(
+        print(" 3) create_dataloader")
+        train_dataloader, val_dataloader, unlabeled_dataloader = create_dataloader(
             combined_dataset,
             val_dataset,
-            unlabeled_dataloader,
+            unlabeled_dataset,
             SCALES,
             train_transform
         )
 
         # Fine-tuning
+        print(" 4) fine-tuning")
         best_weights, best_f1_score, training_loss, val_f1_score = training_all(
             train_dataloader,
             val_dataloader,
@@ -180,21 +210,23 @@ def main():
             best_weights ={},
             learning_rate=1e-5
         )
+
+        graph_loss_epoch(training_loss, val_f1_score, iteration)
+        
+        f1_score_weight = compute_fusion_weights(best_f1_score)
         
 
-    f1_score_weight = compute_fusion_weights(best_f1_score)
+        all_preds, all_masks, all_input = test(
+                val_dataloader,
+                best_weights,
+                f1_score_weight,
+                device
+            )
 
-    all_preds, all_masks, all_input = test(
-            val_dataloader,
-            best_weights,
-            f1_score_weight,
-            device
-        )
     # Plotting results 
     display_result(all_preds, all_masks, all_input)
 
-    # Plotting graph for train and val loss
-    graph_loss_epoch(training_loss, val_f1_score)
+    
     
 
 
