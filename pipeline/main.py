@@ -189,7 +189,9 @@ def main():
             best_weights,
             f1_score_weight,
             device,
-            iteration=iteration
+            iteration=iteration,
+            path_drive = general_path
+
         )
 
         # Combine real and pseudo-labeled data
