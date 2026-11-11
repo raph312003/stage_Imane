@@ -146,11 +146,16 @@ def main():
       
 
     best_weights = {}
+    checkpoint_path = os.path.join(
+        general_path,
+        "model_weights",
+        f"{name}_best.pth"
+    )
 
     for name, value in SCALES.items():
         
         best_weights[name] = torch.load(
-            f"model_weights/{name}_best.pth",
+            checkpoint_path,
             map_location=device,
             weights_only=True,
         )
@@ -213,7 +218,7 @@ def main():
             epoch=1000, # 1000
             early_stopping=10, # 10
             dice_weight=0.5,
-            best_weights ={},
+            best_weights = best_weights,
             learning_rate=1e-5,
             path_drive = general_path
         )
