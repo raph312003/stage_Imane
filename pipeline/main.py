@@ -20,7 +20,12 @@ def main():
     # Parse command-line arguments
     parser = ArgumentParser(description="Train semi-supervised model.")
 
-    parser.add_argument("--google_drive", type=bool, default=False)
+
+    parser.add_argument(
+        "--google_drive",
+        action="store_true",
+        help="Use Google Drive paths"
+    )
     args = parser.parse_args()  # Get args.training_config (Path/None) 
     google_drive_connect = args.google_drive
 
