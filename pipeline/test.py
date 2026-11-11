@@ -369,7 +369,7 @@ def generate_pseudo_label(
         )
 
         pseudo_label, valid_mask = generate_reliable_pseudo_label(
-            [fused_logits,image_full_256,image_full_512, logits_full]
+            [image_full_256,image_full_512, logits_full]
         )
     
         print(f"Generation {i} labels, idx = {idx}")
@@ -527,12 +527,15 @@ def generate_reliable_pseudo_label(logit_list):
 
 def compute_ensemble_metrics(logit_list):
 
+    device = logit_list[0].device
+
     # Conversion des logits en probabilités
     probs = torch.stack([
-        torch.sigmoid(logit).squeeze()
+        torch.sigmoid(logit.to(device)).squeeze()
         for logit in logit_list
     ])
 
+    
     # Moyenne des probabilités
     mean_prob = probs.mean(dim=0)
 
