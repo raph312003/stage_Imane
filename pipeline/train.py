@@ -203,6 +203,8 @@ def training_all(
             classes=1
         )
 
+        model = model.to(device)
+
         if name in best_weights:
             print("fine tuning")
             model.load_state_dict(best_weights[name])

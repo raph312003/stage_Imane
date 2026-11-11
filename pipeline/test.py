@@ -92,6 +92,10 @@ def test(
     # model2 = Unet().to(device)
     # model3 = Unet().to(device)
 
+    model1 = model1.to(device)
+    model2 = model2.to(device)
+    model3 = model3.to(device)
+
     model1.load_state_dict(best_weight["patches256"])
     model2.load_state_dict(best_weight["patches512"])
     model3.load_state_dict(best_weight["full_patches"])
@@ -271,6 +275,10 @@ def generate_pseudo_label(
         classes=1
     )
 
+    model1 = model1.to(device)
+    model2 = model2.to(device)
+    model3 = model3.to(device)
+    
 
     # Initialisation des modèles
     # model1 = Unet().to(device)
