@@ -70,33 +70,33 @@ def main():
     
     #print(os.getcwd())
 
+    # dataset = load_dataset(
+    #     img_dir= "Dataset_Imane/images/",
+    #     mask_dir= "Dataset_Imane/masque/",
+    #     transform = None,
+    #     unlabeled=False
+    # )
+
+    # unlabeled_dataset = load_dataset(
+    #     img_dir= "Dataset_unlabeled/images/",
+    #     mask_dir= "Dataset_unlabeled/masque/",
+    #     transform = None,
+    #     unlabeled=True
+    # )
+
+    dataset_path_labeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
+
     dataset = load_dataset(
-        img_dir= "Dataset_Imane/images/",
-        mask_dir= "Dataset_Imane/masque/",
-        transform = None,
-        unlabeled=False
-    )
-
-    unlabeled_dataset = load_dataset(
-        img_dir= "Dataset_unlabeled/images/",
-        mask_dir= "Dataset_unlabeled/masque/",
-        transform = None,
-        unlabeled=True
-    )
-
-    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
-
-    dataset = load_dataset(
-       img_dir=f"{dataset_path}/images/",
-       mask_dir=f"{dataset_path}/masque/",
+       img_dir=f"{dataset_path_labeled}/images/",
+       mask_dir=f"{dataset_path_labeled}/masque/",
        transform=train_transform
     )
 
-    dataset_path = "/content/drive/MyDrive/PHD/Datasets/Dataset_Unlabeled"
+    dataset_path_unlabeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Unlabeled"
     
-    dataset = load_dataset(
-        img_dir=f"{dataset_path}/images/",
-        mask_dir=f"{dataset_path}/masque/",
+    unlabeled_dataset = load_dataset(
+        img_dir=f"{dataset_path_unlabeled}/images/",
+        mask_dir=f"{dataset_path_unlabeled}/masque/",
         transform=train_transform
     )
 
