@@ -146,13 +146,13 @@ def main():
       
 
     best_weights = {}
-    checkpoint_path = os.path.join(
-        general_path,
-        "model_weights",
-        f"{name}_best.pth"
-    )
-
+    
     for name, value in SCALES.items():
+        checkpoint_path = os.path.join(
+            general_path,
+            "model_weights",
+            f"{name}_best.pth"
+        )
         
         best_weights[name] = torch.load(
             checkpoint_path,
