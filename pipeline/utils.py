@@ -150,7 +150,13 @@ class PatchDataset():
         ):
             self.dataset = dataset
             self.transform = transform 
-            self.patches = []
+            self.patches = [] # stocker tous les images et tous les patchs problème en mémoire
+            # stocker :
+            # - l'image originale
+            # - le mask originale
+            # - les coordonnées des patches 
+            # - l'indice de l'image
+            #   (idx, y, x) -> stocker dans self.patches
 
             for idx in range (len(self.dataset)):
                 image, mask = self.dataset[idx]
@@ -167,22 +173,25 @@ class PatchDataset():
                     self.patches.append(
                         (np.array(image),np.array(mask), (1,1), idx)
                     )
-                     
+# Stocke tous les patches en mémoire                   
 
     def __len__(self):
         return len(self.patches)
          
 
     def __getitem__(self, index):
+        # Récupérer images et masques
+        # création du patch en fonction de l'indice
         img, mask, position, idx = self.patches[index]
         
         if self.transform is not None:
             augmentation = self.transform(image=img, mask=mask)
             img = augmentation["image"]
             mask = augmentation["mask"]
-        # print(img.shape, mask.unsqueeze(0).shape, position,idx )
+        print(img.shape, mask.unsqueeze(0).shape, position,idx )
         return img, mask.unsqueeze(0), position, idx
 
-
+# ne pas stocker tous les patches en mémoire
+# torch.Size([3, 128, 128]) torch.Size([1, 128, 128]) (0, 96) 22
 
 

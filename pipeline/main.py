@@ -125,44 +125,44 @@ def main():
     )
 
     # 1 st training already satisfy
-    # best_weights, best_f1_score, training_loss, val_f1_score = training_all(
-    #     train_dataloader,
-    #     val_dataloader,
-    #     device,
-    #     epoch=1000, # 1000
-    #     early_stopping=10, # 10
-    #     dice_weight=0.5,
-    #     best_weights ={},
-    #     learning_rate=1e-4,
-    #     path_drive = general_path
-    # )
+    best_weights, best_f1_score, training_loss, val_f1_score = training_all(
+        train_dataloader,
+        val_dataloader,
+        device,
+        epoch=1000, # 1000
+        early_stopping=10, # 10
+        dice_weight=0.5,
+        best_weights ={},
+        learning_rate=1e-4,
+        path_drive = general_path
+    )
 
     # In case there is a problem with the testing part
-    best_f1_score = {
-        "patches256": 0.4113,
-        "patches512": 0.3614,
-        "full_patches": 0.4431
-    }
+    # best_f1_score = {
+    #     "patches256": 0.4113,
+    #     "patches512": 0.3614,
+    #     "full_patches": 0.4431
+    # }
       
 
-    best_weights = {}
+    # best_weights = {}
     
-    for name, value in SCALES.items():
-        checkpoint_path = os.path.join(
-            general_path,
-            "model_weights",
-            f"{name}_best.pth"
-        )
+    # for name, value in SCALES.items():
+    #     checkpoint_path = os.path.join(
+    #         general_path,
+    #         "model_weights",
+    #         f"{name}_best.pth"
+    #     )
         
-        best_weights[name] = torch.load(
-            checkpoint_path,
-            map_location=device,
-            weights_only=True,
-        )
+    #     best_weights[name] = torch.load(
+    #         checkpoint_path,
+    #         map_location=device,
+    #         weights_only=True,
+    #     )
 
     # Plotting graph for train and val loss
-    # iteration = 0
-    # graph_loss_epoch(training_loss, val_f1_score, iteration)
+    iteration = 0
+    graph_loss_epoch(training_loss, val_f1_score, iteration)
 
     f1_score_weight = compute_fusion_weights(best_f1_score)
             
@@ -177,10 +177,10 @@ def main():
     # SELF-TRAINING ITERATION
 
     for iteration in range(1, NUM_ITERATIONS+1):
+        train_dataloader = {}
+        print(f"\n===== SELF-TRAINING ITERATION {iteration} =====")
 
-        print(f"\n===== SELF-TRAINING ITERATION {iteration + 1} =====")
-
-        f1_score_weight = compute_fusion_weights(best_f1_score)
+        # f1_score_weight = compute_fusion_weights(best_f1_score)
 
         # Generate pseudo-labels
         print(" 1) Generate pseudo-labels")
@@ -203,13 +203,33 @@ def main():
 
         # Create new dataloaders
         print(" 3) create_dataloader")
-        train_dataloader, val_dataloader, unlabeled_dataloader = create_dataloader(
-            combined_dataset,
-            val_dataset,
-            unlabeled_dataset,
-            SCALES,
-            train_transform
-        )
+        # train_dataloader, val_dataloader, unlabeled_dataloader = create_dataloader(
+        #     combined_dataset,
+        #     val_dataset,
+        #     unlabeled_dataset,
+        #     SCALES,
+        #     train_transform
+        # )
+
+        for key, value in SCALES.items():
+
+            train_patchs = PatchDataset(
+                combined_dataset,
+                patch_size=value,
+                transform=train_transform
+            )
+
+            batch_size = {
+                "patches256": 16,
+                "patches512": 8,
+                "full_patches": 1
+            }[key]
+
+            train_dataloader[key] = DataLoader(
+                train_patchs,
+                batch_size=batch_size,
+                shuffle=True
+            )
 
         # Fine-tuning
         print(" 4) fine-tuning")

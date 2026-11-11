@@ -6,3 +6,4 @@
 /images
 /Dataset
 /model_weights
+*.log
