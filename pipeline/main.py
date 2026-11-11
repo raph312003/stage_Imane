@@ -125,35 +125,35 @@ def main():
     )
 
     # 1 st training already satisfy
-    best_weights, best_f1_score, training_loss, val_f1_score = training_all(
-        train_dataloader,
-        val_dataloader,
-        device,
-        epoch=1000, # 1000
-        early_stopping=10, # 10
-        dice_weight=0.5,
-        best_weights ={},
-        learning_rate=1e-4,
-        path_drive = general_path
-    )
+    # best_weights, best_f1_score, training_loss, val_f1_score = training_all(
+    #     train_dataloader,
+    #     val_dataloader,
+    #     device,
+    #     epoch=1000, # 1000
+    #     early_stopping=10, # 10
+    #     dice_weight=0.5,
+    #     best_weights ={},
+    #     learning_rate=1e-4,
+    #     path_drive = general_path
+    # )
 
-    # # In case there is a problem with the testing part
-    # best_f1_score = {
-    #     "patches256": 0.2746,
-    #     "patches512": 0.2710,
-    #     "full_patches": 0.3673
-    # }
+    # In case there is a problem with the testing part
+    best_f1_score = {
+        "patches256": 0.4113,
+        "patches512": 0.3614,
+        "full_patches": 0.4431
+    }
       
 
-    # best_weights = {}
+    best_weights = {}
 
-    # for name, value in SCALES.items():
+    for name, value in SCALES.items():
         
-    #     best_weights[name] = torch.load(
-    #         f"model_weights/{name}_best.pth",
-    #         map_location=device,
-    #         weights_only=True,
-    #     )
+        best_weights[name] = torch.load(
+            f"model_weights/{name}_best.pth",
+            map_location=device,
+            weights_only=True,
+        )
 
     # Plotting graph for train and val loss
     # iteration = 0
@@ -163,11 +163,11 @@ def main():
             
     
     all_preds, all_masks, all_input = test(
-            val_dataloader,
-            best_weights,
-            f1_score_weight,
-            device
-        )
+        val_dataloader,
+        best_weights,
+        f1_score_weight,
+        device
+    )
     
     # SELF-TRAINING ITERATION
 

@@ -143,11 +143,16 @@ def fuse_weight(logit_list, weights):
     if len(logit_list) == 0:
         raise ValueError("Liste de logits vide.")
 
+    device = logit_list[0].device
+    dtype = logit_list[0].dtype
+
     fused = torch.zeros_like(logit_list[0])
 
     for logit, weight in zip(logit_list, weights):
         if logit.shape != fused.shape:
             raise ValueError("Les logits doivent avoir la même shape.")
+
+        logit = logit.to(device=device, dtype=dtype)
 
         fused += logit * weight
 
