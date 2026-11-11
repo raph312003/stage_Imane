@@ -3,6 +3,7 @@ from pipeline.train import fuse_weight
 import numpy as np
 import matplotlib.pyplot as plt
 import segmentation_models_pytorch as smp
+import os 
 
 from sklearn.metrics import (
     jaccard_score,
@@ -241,7 +242,8 @@ def generate_pseudo_label(
     best_weight,
     f1_score_weight,
     device,
-    iteration
+    iteration,
+    path_drive
 ):
     
     all_preds_mask = []
@@ -382,7 +384,7 @@ def generate_pseudo_label(
     all_preds_mask = torch.stack(all_preds_mask, dim=0)
     all_idx = torch.stack(all_index, dim=0)
 
-    display_result_pseudo_labels(all_preds_mask, all_input, all_idx, iteration)
+    display_result_pseudo_labels(all_preds_mask, all_input, all_idx, iteration, path_drive)
 
     # Construction du Dataset
     pseudo_dataset = PseudoLabelDataset(
@@ -393,9 +395,12 @@ def generate_pseudo_label(
     return pseudo_dataset
 
 
-def display_result(all_preds, all_masks, all_input):
+def display_result(all_preds, all_masks, all_input, path_drive = ""):
     
     names = ["patches256", "patches512", "full_patches", "fusion"]
+
+    image_dir = os.path.join(path_drive, "images")
+    os.makedirs(image_dir, exist_ok=True)
 
     for name in names:
         fig, axes = plt.subplots(3, all_preds[name].shape[0], figsize=(5*all_preds[name].shape[0],10), squeeze=False)
@@ -419,12 +424,14 @@ def display_result(all_preds, all_masks, all_input):
             axes[2][i].axis("off")
 
         plt.tight_layout()
-        plt.savefig(f"images/{name}.png")
+        plt.savefig(os.path.join(image_dir, f"{name}.png"))
         plt.close() 
 
-def display_result_pseudo_labels(all_preds, all_input, all_index, iteration):
+def display_result_pseudo_labels(all_preds, all_input, all_index, iteration, path_drive=""):
     
     max_image = 2
+    image_dir = os.path.join(path_drive, "images")
+    os.makedirs(image_dir, exist_ok=True)
     #for name in names:
     fig, axes = plt.subplots(2, max_image, figsize=(5*max_image, 10))
 
@@ -442,10 +449,13 @@ def display_result_pseudo_labels(all_preds, all_input, all_index, iteration):
         axes[1][i].axis("off")
 
     plt.tight_layout()
-    plt.savefig(f"images/pseudo_labels_{iteration}.png")
+    plt.savefig(os.path.join(image_dir,f"pseudo_labels_{iteration}.png"))
     plt.close()   
 
-def graph_loss_epoch(list_avg_train_loss, list_avg_val_loss, iteration):
+def graph_loss_epoch(list_avg_train_loss, list_avg_val_loss, iteration, path_drive=""):
+
+    image_dir = os.path.join(path_drive, "images")
+    os.makedirs(image_dir, exist_ok=True)
 
     fig, ax = plt.subplots(figsize=(12, 7))
 
@@ -476,7 +486,7 @@ def graph_loss_epoch(list_avg_train_loss, list_avg_val_loss, iteration):
     ax.grid(alpha=0.3)
 
     plt.tight_layout()
-    plt.savefig(f"images/all_loss_curves_{iteration}.png")
+    plt.savefig(os.path.join(image_dir, f"all_loss_curves_{iteration}.png"))
     plt.show()
     plt.close()
 

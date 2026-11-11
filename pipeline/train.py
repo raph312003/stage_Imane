@@ -166,7 +166,8 @@ def training_all(
     early_stopping,
     dice_weight,
     best_weights,
-    learning_rate
+    learning_rate,
+    path_drive
 ):
     best_f1_score = {}
     updated_weights = {}
@@ -177,8 +178,13 @@ def training_all(
         training_loss = []
         val_f1_score = []
         
+        
         print(f"name model {name}")
-        checkpoint_path = f"model_weights/{name}_best.pth"
+        checkpoint_path = os.path.join(
+            path_drive,
+            "model_weights",
+            f"{name}_best.pth"
+        )
 
         best_f1 = float("-inf")
         patience_counter = 0
@@ -257,7 +263,10 @@ def training_all(
                 patience_counter = 0
 
                 # updated_weights[name] = copy.deepcopy(model.state_dict())
-                os.makedirs(f"model_weights/", exist_ok=True)
+                os.makedirs(
+                    os.path.join(path_drive, "model_weights"),
+                    exist_ok=True
+                )
                 torch.save(
                     model.state_dict(),
                     checkpoint_path

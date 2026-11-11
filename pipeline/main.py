@@ -9,12 +9,29 @@ from pipeline.dataset import load_dataset, create_dataloader
 from pipeline.utils import PatchDataset
 from pipeline.train import training_all, compute_fusion_weights 
 from pipeline.test import test, graph_loss_epoch, display_result, generate_pseudo_label
+
+from argparse import ArgumentParser
 import os
 
 
 
 
 def main():
+    # Parse command-line arguments
+    parser = ArgumentParser(description="Train semi-supervised model.")
+
+    parser.add_argument("--google_drive", type=bool, default=False)
+    args = parser.parse_args()  # Get args.training_config (Path/None) 
+    google_drive_connect = args.google_drive
+
+    if google_drive_connect:
+        dataset_path_labeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
+        dataset_path_unlabeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Unlabeled"
+        general_path = "/content/drive/MyDrive/PHD/"
+    else :
+        dataset_path_labeled = "Dataset_Imane"
+        dataset_path_unlabeled = "Dataset_Unlabeled"
+        general_path = ""
 
     NUM_ITERATIONS = 3
 
@@ -67,38 +84,19 @@ def main():
         ],
     )
 
-    
-    #print(os.getcwd())
-
-    # dataset = load_dataset(
-    #     img_dir= "Dataset_Imane/images/",
-    #     mask_dir= "Dataset_Imane/masque/",
-    #     transform = None,
-    #     unlabeled=False
-    # )
-
-    # unlabeled_dataset = load_dataset(
-    #     img_dir= "Dataset_unlabeled/images/",
-    #     mask_dir= "Dataset_unlabeled/masque/",
-    #     transform = None,
-    #     unlabeled=True
-    # )
-
-    dataset_path_labeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Imane"
 
     dataset = load_dataset(
        img_dir=f"{dataset_path_labeled}/images/",
        mask_dir=f"{dataset_path_labeled}/masque/",
-       transform=train_transform,
+       transform=None,
        unlabeled=False
     )
 
-    dataset_path_unlabeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Unlabeled"
     
     unlabeled_dataset = load_dataset(
         img_dir=f"{dataset_path_unlabeled}/images/",
         mask_dir=f"{dataset_path_unlabeled}/masque/",
-        transform=train_transform,
+        transform=None,
         unlabeled=True
     )
 
@@ -130,7 +128,8 @@ def main():
         early_stopping=10, # 10
         dice_weight=0.5,
         best_weights ={},
-        learning_rate=1e-4
+        learning_rate=1e-4,
+        path_drive = general_path
     )
 
     # # In case there is a problem with the testing part
@@ -210,10 +209,11 @@ def main():
             early_stopping=10, # 10
             dice_weight=0.5,
             best_weights ={},
-            learning_rate=1e-5
+            learning_rate=1e-5,
+            path_drive = general_path
         )
 
-        graph_loss_epoch(training_loss, val_f1_score, iteration)
+        graph_loss_epoch(training_loss, val_f1_score, iteration, path_drive=general_path)
         
         f1_score_weight = compute_fusion_weights(best_f1_score)
         
@@ -226,7 +226,7 @@ def main():
             )
 
     # Plotting results 
-    display_result(all_preds, all_masks, all_input)
+    display_result(all_preds, all_masks, all_input, path_drive=general_path)
 
     
     
