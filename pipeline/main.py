@@ -89,7 +89,8 @@ def main():
     dataset = load_dataset(
        img_dir=f"{dataset_path_labeled}/images/",
        mask_dir=f"{dataset_path_labeled}/masque/",
-       transform=train_transform
+       transform=train_transform,
+       unlabeled=False
     )
 
     dataset_path_unlabeled = "/content/drive/MyDrive/PHD/Datasets/Dataset_Unlabeled"
@@ -97,7 +98,8 @@ def main():
     unlabeled_dataset = load_dataset(
         img_dir=f"{dataset_path_unlabeled}/images/",
         mask_dir=f"{dataset_path_unlabeled}/masque/",
-        transform=train_transform
+        transform=train_transform,
+        unlabeled=True
     )
 
     train_size = int(0.8 * len(dataset))
